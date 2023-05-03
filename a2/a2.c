@@ -26,7 +26,7 @@ void thread_function_sincronizare(void *arg) ///2.3
 
     while(thread_num > current_thread_sincronizare) ///asteptam sa fie randul thread ului curent sa inceapa, pentru a ne asigura ca thread ul 1 va incepe inaintea thread-ului 3
     {
-        int waiting = pthread_self();
+        int waiting = (int)pthread_self();
         if(waiting) continue;
     }
     info(BEGIN,process_num,thread_num);
@@ -51,7 +51,7 @@ void thread_function_bariera(void *arg) ///2.4
 
     while(thread_num != current_thread_bariera) ///asteptam sa fie randul thread ului curent sa inceapa, pentru a ne asigura ca thread ul 1 va incepe inaintea thread-ului 3
     {
-        int waiting = pthread_self();
+        int waiting = (int)pthread_self();
         if(waiting) continue;
     }
     info(BEGIN,process_num,thread_num);
@@ -95,7 +95,7 @@ void thread_function_proceseDiferite(void *arg) ///2.5
 
     while(thread_num > current_thread_proceseDiferite) ///asteptam sa fie randul thread ului curent sa inceapa, pentru a ne asigura ca thread ul 1 va incepe inaintea thread-ului 3
     {
-        int waiting = pthread_self();
+        int waiting = (int)pthread_self();
         if(waiting) continue;
     }
     info(BEGIN,process_num,thread_num);
