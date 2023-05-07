@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <fcntl.h>
 #define NUMBER_OF_THREADS_FOR_P2 5
 
 
@@ -41,77 +42,58 @@ void thread_function_sincronizare(void *arg) ///2.3
 
 }
 
-int current_thread_bariera =1;
+sem_t sem;
+int wait_barrier = 1;
 
-void thread_function_bariera(void *arg) ///2.4
+void thread_function_bariera_v1(void *arg) ///2.4
 {
     struct thread_data *data = (struct thread_data *)arg;
     int process_num = data->process_number;
     int thread_num = data->thread_number;
 
-    while(thread_num != current_thread_bariera) ///asteptam sa fie randul thread ului curent sa inceapa, pentru a ne asigura ca thread ul 1 va incepe inaintea thread-ului 3
-    {
-        intptr_t waiting = (intptr_t)pthread_self();
-        if(waiting) continue;
-    }
     info(BEGIN,process_num,thread_num);
 
-    if(current_thread_bariera%4==0) ///inchidem tot din 4 in 4 thread-uri
-    {
-        printf("Am ajuns la un thread divizibil cu 4 : %d\n",thread_num);
-        if(current_thread_bariera == 12) ///ne aflam in "colectia" unde se afla si thread ul 10
-        {
-            printf("Am intrat in if-ul cu 12 : %d\n",thread_num);
-            info(END,process_num,10); ///ne asiguram ca thread-ul 10 se incheie atunci cand ruleaza(impreuna cu el) 4 thread-uri simultan
-            info(END,process_num,current_thread_bariera-3);
-            info(END,process_num,current_thread_bariera-1);
-            info(END,process_num,current_thread_bariera);
-        }
-        else
-        {
-            printf("Am intrat in if-ul dinainte de 12 : %d\n",thread_num);
-            info(END,process_num,current_thread_bariera-3);
-            info(END,process_num,current_thread_bariera-2);
-            info(END,process_num,current_thread_bariera-1);
-            info(END,process_num,current_thread_bariera);
-
-        }
-
+    if (thread_num != 10) {
+        sem_wait(&sem);
+        while (wait_barrier);
     }
-    else if(current_thread_bariera == 37) info(END,8,37);
-
-    current_thread_bariera++;
-
-    pthread_exit(NULL);
-}
-
-int current_thread_proceseDiferite =1;
-
-void thread_function_proceseDiferite(void *arg) ///2.5
-{
-    struct thread_data *data = (struct thread_data *)arg;
-    int process_num = data->process_number;
-    int thread_num = data->thread_number;
-
-    while(thread_num > current_thread_proceseDiferite) ///asteptam sa fie randul thread ului curent sa inceapa, pentru a ne asigura ca thread ul 1 va incepe inaintea thread-ului 3
-    {
-        intptr_t waiting = (intptr_t)pthread_self();
-        if(waiting) continue;
-    }
-    info(BEGIN,process_num,thread_num);
-    current_thread_proceseDiferite++;
 
     info(END,process_num,thread_num);
 
-    pthread_exit(NULL);
+    if (thread_num == 10) {
+        sem_post(&sem);
+        wait_barrier = 0;
+        sem_destroy(&sem);
+    }
 
+    pthread_exit(NULL);
 }
+
+void thread_function_normal(void *arg) ///2.4
+{
+    struct thread_data *data = (struct thread_data *)arg;
+    int process_num = data->process_number;
+    int thread_num = data->thread_number;
+
+    info(BEGIN,process_num,thread_num);
+    info(END,process_num,thread_num);
+
+    pthread_exit(NULL);
+}
+
+sem_t *sem1, *sem2;
 
 int main()
 {
     init();
 
     info(BEGIN, 1, 0);
+
+    sem_unlink("/sema1");
+    sem_unlink("/sema2");
+
+    sem1 = sem_open("/sema1", O_CREAT, 0600, 0);
+    sem2 = sem_open("/sema2", O_CREAT, 0600, 0);
 
     pid_t P2=-1, P3=-1, P4=-1, P5=-1, P6=-1, P7=-1, P8=-1, P9=-1;
 
@@ -140,15 +122,23 @@ int main()
 
             ///crearea thread-urilor
 
+            struct thread_data data[6];
+
             pthread_t threads[6];
+            for (int i = 0; i < 6; ++i) {
+                data[i].process_number = 3;
+                data[i].thread_number=i+1;
+            }
 
-            for(int i=0; i<6; i++)
+            pthread_create(&threads[0],NULL,(void *) thread_function_normal,(void *)&data[0]);
+            pthread_join(threads[0],NULL);
+
+            sem_post(sem1);
+            sem_wait(sem2);
+
+            for(int i=1; i<6; i++)
             {
-
-                struct thread_data *data = malloc(sizeof(struct thread_data));
-                data->process_number = 3;
-                data->thread_number=i+1;
-                int tc = pthread_create(&threads[i],NULL,(void *)thread_function_proceseDiferite,(void *)data);
+                int tc = pthread_create(&threads[i],NULL,(void *) thread_function_normal,(void *)&data[i]);
                 if(tc)
                 {
                     printf("Eroare la crearea thread-ului %d\n",i+1);
@@ -157,7 +147,7 @@ int main()
             }
 
             ///asteptam terminarea fiecarui thread
-            for(int i=0; i<6; i++)
+            for(int i=1; i<6; i++)
             {
                 pthread_join(threads[i],NULL);
             }
@@ -168,7 +158,6 @@ int main()
             exit(0);
 
         }
-        waitpid(P3,NULL,0);
 
         ///cream P8
         P8 = fork();
@@ -185,30 +174,66 @@ int main()
 
             ///crearea thread-urilor
             pthread_t threads[37];
+            struct thread_data data[37];
+            for (int i = 0; i < 37; ++i) {
+                data[i].process_number = 8;
+                data[i].thread_number = i + 1;
+            }
 
-            for(int i=0; i<37; i++)
-            {
+            sem_init(&sem, 1, 5);
 
-                struct thread_data *data = malloc(sizeof(struct thread_data));
-                data->process_number = 8;
-                data->thread_number=i+1;
-                int tc = pthread_create(&threads[i],NULL,(void *)thread_function_bariera,(void *)data);
-                if(tc)
-                {
-                    printf("Eroare la crearea thread-ului %d\n",i+1);
+            for (int i = 8; i < 12; i++) {
+
+                int tc = pthread_create(&threads[i], NULL, (void *) thread_function_bariera_v1, (void *) &data[i]);
+                if (tc) {
+                    printf("Eroare la crearea thread-ului %d\n", i + 1);
                     exit(1);
                 }
 
             }
 
             ///asteptam terminarea fiecarui thread
-            for(int i=0; i<37; i++)
-            {
-                pthread_join(threads[i],NULL);
+            for (int i = 8; i < 12; i++) {
+                pthread_join(threads[i], NULL);
             }
 
-            ///P8 se termina
-            ///info(END,8,37);
+            for(int i = 0; i < 36; i+= 4){
+                if (i == 8){
+                    continue;
+                }
+                int tc1 = pthread_create(&threads[i], NULL, (void *) thread_function_normal, (void *) &data[i]);
+                int tc2 = pthread_create(&threads[i + 1], NULL, (void *) thread_function_normal, (void *) &data[i + 1]);
+                int tc3 = pthread_create(&threads[i + 2], NULL, (void *) thread_function_normal, (void *) &data[i + 2]);
+                int tc4 = pthread_create(&threads[i + 3], NULL, (void *) thread_function_normal, (void *) &data[i + 3]);
+                if (tc1) {
+                    printf("Eroare la crearea thread-ului %d\n", i + 1);
+                    exit(1);
+                }
+                if (tc2) {
+                    printf("Eroare la crearea thread-ului %d\n", i + 2);
+                    exit(1);
+                }
+                if (tc3) {
+                    printf("Eroare la crearea thread-ului %d\n", i + 3);
+                    exit(1);
+                }
+                if (tc4) {
+                    printf("Eroare la crearea thread-ului %d\n", i + 4);
+                    exit(1);
+                }
+                pthread_join(threads[i], NULL);
+                pthread_join(threads[i + 1], NULL);
+                pthread_join(threads[i + 2], NULL);
+                pthread_join(threads[i + 3], NULL);
+            }
+
+            int tc = pthread_create(&threads[36], NULL, (void *) thread_function_normal, (void *) &data[36]);
+            if (tc) {
+                printf("Eroare la crearea thread-ului %d\n", 37);
+                exit(1);
+            }
+            pthread_join(threads[36], NULL);
+
             info(END,8,0);
             exit(0);
 
@@ -217,6 +242,8 @@ int main()
 
         ///crearea thread-urilor
         pthread_t threads[5];
+
+        sem_wait(sem1);
 
         for(int i=0; i<5; i++)
         {
@@ -239,11 +266,18 @@ int main()
             pthread_join(threads[i],NULL);
         }
 
-        ///P2 se termina
+        sem_post(sem2);
+
         info(END,2,1);
+
+        waitpid(P3,NULL,0);
+
+        ///P2 se termina
         info(END,2,0);
+
         exit(0);
     }
+
     waitpid(P2,NULL,0);
 
     ///cream P4
@@ -336,7 +370,6 @@ int main()
 
     ///P1 se termina
     info(END,1,0);
-    exit(0);
 
     return 0;
 }
