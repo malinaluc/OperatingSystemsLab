@@ -38,9 +38,10 @@ Test score: 5 / 5
 [TESTER] received string 'HELLO'
 [TESTER] sending string 'MAP_FILE'
 [TESTER] sending string 'test_root/4PcBugt4Yr.tbK'
-[TESTER] received string 'WRITE_TO_SHM'
+[TESTER] received string 'MAP_FILE'
+[TESTER] received string 'SUCCESS'
 [TESTER] sending string 'EXIT'
-Test score: 1 / 5
+Test score: 5 / 5
 [1;35mTesting read_offset...[0m
 [TESTER] received string 'HELLO'
 [TESTER] sending string 'CREATE_SHM'
@@ -75,5 +76,5 @@ Test score: 1 / 10
 [TESTER] sending string 'EXIT'
 Test score: 1 / 10
 
-Total score: 33 / 70
-Assignment grade: 47.14 / 100
+Total score: 37 / 70
+Assignment grade: 52.86 / 100

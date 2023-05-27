@@ -145,7 +145,10 @@ int main()
                 return 1;
             }
 
-            unsigned *ptr = (unsigned *)((char *)shmaddr + offset);
+            shmaddr = mmap(NULL, shared_mem_size,PROT_READ,MAP_SHARED,shmid,0);
+
+
+            unsigned *ptr = (unsigned *)((char *)shmaddr + (int)offset+4);
             *ptr = value;
             memcpy((void *)((char *)shmaddr + offset), &value, sizeof(unsigned));
 
@@ -177,13 +180,10 @@ int main()
             if (file_ptr == MAP_FAILED)
             {
                 writeStringField("MAP_FILE!ERROR!");
-                munmap(shmaddr, file_stat.st_size);
-                close(fd);
-                close(shmid);
                 return 1;
             }
 
-            writeStringField("WRITE_TO_SHM!SUCCESS!");
+            writeStringField("MAP_FILE!SUCCESS!");
 
         }
         //ex2.7
@@ -221,22 +221,21 @@ int main()
                 printf("%c", curr_oct);
             }
 
-            munmap(file_mapping, file_size);
-            close(fd);
-
-            writeStringField("WRITE_TO_SHM!SUCCESS!");
+            writeStringField("READ_FROM_FILE_OFFSET!SUCCESS!");
         }
         //ex2.8
         else if (strcmp(request, "READ_FROM_FILE_SECTION") == 0)
         {
 
-            writeStringField("WRITE_TO_SHM!SUCCESS!");
+            writeStringField("READ_FROM_FILE_SECTION!SUCCESS!");
         }
         //ex2.9
         else if (strcmp(request, "READ_FROM_LOGICAL_SPACE_OFFSET") == 0)
         {
+            /*unsigned logical_offset = readNumberField();
+            unsigned no_of_bytes = readNumberField();*/
 
-            writeStringField("WRITE_TO_SHM!SUCCESS!");
+            writeStringField("READ_FROM_LOGICAL_SPACE_OFFSET!SUCCESS!");
         }
         // ex2.10 comanda de iesire
         else if (strcmp(request, "EXIT") == 0)
