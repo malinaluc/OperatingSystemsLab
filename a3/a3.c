@@ -14,7 +14,7 @@ int fdreq = -1;
 int fdresp = -1;
 
 int shmid;
-void *shmaddr;
+void *shmaddr = NULL;
 void *file_ptr;
 
 off_t shared_mem_size ;
@@ -25,12 +25,7 @@ int fd; ///fisierul din memoria partajata
 
 void writeStringField(char* string)
 {
-    char aux[strlen(string) + 2];
-    strcpy(aux, string);
-    aux[strlen(string)] = '!';
-    aux[strlen(string) + 1] = '\0';
-
-    write(fdresp, aux, strlen(aux));
+    write(fdresp, string, strlen(string));
 }
 
 void writeNumberField(unsigned number)
@@ -90,7 +85,7 @@ int main()
 
     }
 
-    writeStringField("HELLO");
+    writeStringField("HELLO!");
 
     char request[100];
 
@@ -101,8 +96,8 @@ int main()
         // ex2.3
         if (strcmp(request, "VARIANT") == 0)
         {
-            writeStringField("VARIANT");
-            writeStringField("VALUE");
+            writeStringField("VARIANT!");
+            writeStringField("VALUE!");
             writeNumberField(58203);
         }
         //ex2.4
@@ -113,21 +108,21 @@ int main()
             if (shmid == -1)
             {
                 writeStringField("CREATE_SHM!ERROR!");
-                exit(1);
+                continue;
             }
 
             shared_mem_size = number;
             if (ftruncate(shmid, shared_mem_size) == -1)
             {
                 writeStringField("CREATE_SHM!ERROR!");
-                return 1;
+                continue;
             }
 
             shmaddr = mmap(NULL, shared_mem_size, PROT_READ | PROT_WRITE, MAP_SHARED,shmid, 0);
             if (shmaddr == (void*) -1)
             {
                 writeStringField("CREATE_SHM!ERROR!");
-                exit(1);
+                continue;
             }
 
             writeStringField("CREATE_SHM!SUCCESS!");
@@ -139,18 +134,19 @@ int main()
             unsigned offset = readNumberField();
             unsigned value = readNumberField(); ///valoarea de scris in memorie la offset
 
-            if (offset <0 || offset>=3613231 || offset >= shared_mem_size + sizeof(value))
+            if (offset <0 || offset >= 3613231 || offset + sizeof(value) >= shared_mem_size)
             {
                 writeStringField("WRITE_TO_SHM!ERROR!");
-                return 1;
+                continue;
             }
 
-            shmaddr = mmap(NULL, shared_mem_size,PROT_READ,MAP_SHARED,shmid,0);
+            if (shmaddr == NULL) {
+                writeStringField("WRITE_TO_SHM!ERROR!");
+                continue;
+            }
 
-
-            unsigned *ptr = (unsigned *)((char *)shmaddr + (int)offset+4);
+            unsigned *ptr = (unsigned *) (shmaddr + offset);
             *ptr = value;
-            memcpy((void *)((char *)shmaddr + offset), &value, sizeof(unsigned));
 
             writeStringField("WRITE_TO_SHM!SUCCESS!");
 
@@ -159,20 +155,20 @@ int main()
         else if (strcmp(request, "MAP_FILE") == 0)
         {
 
-            char nume_fisier[100];
+            char nume_fisier[512];
             readStringField(nume_fisier);
 
             fd = open(nume_fisier,O_RDONLY);
             if(fd==-1)
             {
                 writeStringField("MAP_FILE!ERROR!");
-                return 1;
+                continue;
             }
 
             if (fstat(fd, &file_stat) == -1)
             {
                 writeStringField("MAP_FILE!ERROR!");
-                return 1;
+                continue;
             }
 
 
@@ -180,7 +176,7 @@ int main()
             if (file_ptr == MAP_FAILED)
             {
                 writeStringField("MAP_FILE!ERROR!");
-                return 1;
+                continue;
             }
 
             writeStringField("MAP_FILE!SUCCESS!");
@@ -195,38 +191,16 @@ int main()
             if(offset < 0 || offset+no_of_bytes>= file_stat.st_size)
             {
                 writeStringField("READ_FROM_FILE_OFFSET!ERROR!");
-                return 1;
+                continue;
             }
 
-            if(fstat(fd,&file_stat) ==-1)
-            {
-                writeStringField("READ_FROM_FILE_OFFSET!ERROR!");
-                exit(EXIT_FAILURE);
-            }
-
-            off_t file_size = file_stat.st_size;
-
-            void *file_mapping = mmap(NULL, file_size, PROT_READ,MAP_SHARED,fd,0);
-
-            if (file_mapping == (void*) -1)
-            {
-                writeStringField("READ_FROM_FILE_OFFSET!ERROR!");
-                exit(1);
-            }
-
-            char *file_data = (char*)file_mapping;
-            for(off_t i = offset ; i<no_of_bytes; i++)
-            {
-                char curr_oct = file_data[i];
-                printf("%c", curr_oct);
-            }
+            memcpy(shmaddr, file_ptr + offset, no_of_bytes);
 
             writeStringField("READ_FROM_FILE_OFFSET!SUCCESS!");
         }
         //ex2.8
         else if (strcmp(request, "READ_FROM_FILE_SECTION") == 0)
         {
-
             writeStringField("READ_FROM_FILE_SECTION!SUCCESS!");
         }
         //ex2.9
@@ -254,4 +228,3 @@ int main()
 
     return 0;
 }
-
